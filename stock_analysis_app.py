@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import yfinance as yf
 from datetime import datetime
+import plotly.express as px
+import numpy as np
 
 # Load dataset
 csv_file = "nifty50_closing_prices.csv"
@@ -20,28 +22,31 @@ selected_stocks = st.sidebar.multiselect("Select Stocks", df.columns[1:], defaul
 # Filter data based on selected stocks
 df_selected = df[['Date'] + selected_stocks]
 
-# Historical Trend Visualization
+# Historical Trend Visualization with hover feature
 st.subheader("Historical Trends")
-fig, ax = plt.subplots(figsize=(10, 5))
-for stock in selected_stocks:
-    ax.plot(df_selected['Date'], df_selected[stock], label=stock)
-ax.set_xlabel("Date")
-ax.set_ylabel("Stock Price")
-ax.set_title("Stock Price Over Time")
-ax.legend()
-plt.xticks(rotation=45)  # Improve date readability
-st.pyplot(fig)
+fig = px.line(df_selected, x='Date', y=selected_stocks, title="Stock Price Over Time", labels={'value': 'Stock Price', 'Date': 'Date'})
+fig.update_traces(mode='lines+markers', hovertemplate='%{x}<br>%{y}')
+st.plotly_chart(fig)
 
 # Bar Chart for better comparison
 st.subheader("Stock Comparison - Bar Graph")
 latest_prices = df_selected.iloc[-1, 1:]
-fig, ax = plt.subplots()
-sns.barplot(x=latest_prices.index, y=latest_prices.values, ax=ax)
-ax.set_xlabel("Stock")
-ax.set_ylabel("Latest Closing Price")
-ax.set_title("Latest Stock Prices")
-plt.xticks(rotation=45)
-st.pyplot(fig)
+fig = px.bar(x=latest_prices.index, y=latest_prices.values, labels={'x': 'Stock', 'y': 'Latest Closing Price'}, title="Latest Stock Prices")
+st.plotly_chart(fig)
+
+# Risk and Volatility Calculation
+def calculate_risk_volatility(stock):
+    returns = df[stock].pct_change().dropna()
+    risk = np.std(returns)
+    volatility = risk * np.sqrt(252)  # Annualized volatility
+    return risk, volatility
+
+st.subheader("Risk & Volatility Analysis")
+risk_volatility_results = {}
+for stock in selected_stocks:
+    risk, volatility = calculate_risk_volatility(stock)
+    risk_volatility_results[stock] = {'Risk': risk, 'Volatility': volatility}
+st.write("Risk & Volatility Data:", risk_volatility_results)
 
 # Future Prediction using Yahoo Finance
 def predict_future(stock):
