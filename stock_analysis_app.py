@@ -1,56 +1,59 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import yfinance as yf
-from sklearn.linear_model import LinearRegression
-import numpy as np
-import os
+from datetime import datetime
 
-# Load the dataset
-CSV_FILE = "nifty50_closing_prices.csv"
+# Load dataset
+csv_file = "nifty50_closing_prices.csv"
+df = pd.read_csv(csv_file)
+df['Date'] = pd.to_datetime(df['Date'])  # Ensure Date column is in datetime format
 
-def load_data():
-    if os.path.exists(CSV_FILE):
-        return pd.read_csv(CSV_FILE)
-    else:
-        st.error(f"CSV file not found: {CSV_FILE}. Please check the file location.")
-        return None
+# Streamlit UI setup
+st.title("Stock Analysis Predictor")
+st.sidebar.header("Stock Selection")
 
-data = load_data()
+# Allow multiple stock selection
+selected_stocks = st.sidebar.multiselect("Select Stocks", df.columns[1:], default=df.columns[1])
 
-if data is not None:
-    st.title("Stock Analysis Predictor")
-    st.sidebar.header("Select Stock")
-    stock_list = data.columns[1:]
-    selected_stock = st.sidebar.selectbox("Choose a stock:", stock_list)
+# Filter data based on selected stocks
+df_selected = df[['Date'] + selected_stocks]
 
-    # Display historical trends
-    st.subheader(f"Historical Trend of {selected_stock}")
-    fig, ax = plt.subplots()
-    ax.plot(data['Date'], data[selected_stock], label=selected_stock, color='blue')
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Closing Price")
-    ax.legend()
-    st.pyplot(fig)
+# Historical Trend Visualization
+st.subheader("Historical Trends")
+fig, ax = plt.subplots(figsize=(10, 5))
+for stock in selected_stocks:
+    ax.plot(df_selected['Date'], df_selected[stock], label=stock)
+ax.set_xlabel("Date")
+ax.set_ylabel("Stock Price")
+ax.set_title("Stock Price Over Time")
+ax.legend()
+plt.xticks(rotation=45)  # Improve date readability
+st.pyplot(fig)
 
-    # Future Prediction using Linear Regression
-    st.subheader("Future Prediction")
-    try:
-        stock_prices = data[selected_stock].dropna().values.reshape(-1, 1)
-        days = np.arange(len(stock_prices)).reshape(-1, 1)
-        
-        model = LinearRegression()
-        model.fit(days, stock_prices)
-        
-        future_days = np.arange(len(stock_prices), len(stock_prices) + 30).reshape(-1, 1)
-        predicted_prices = model.predict(future_days)
-        
-        fig_pred, ax_pred = plt.subplots()
-        ax_pred.plot(days, stock_prices, label="Historical Prices", color='blue')
-        ax_pred.plot(future_days, predicted_prices, label="Predicted Prices", color='red', linestyle='dashed')
-        ax_pred.set_xlabel("Days")
-        ax_pred.set_ylabel("Stock Price")
-        ax_pred.legend()
-        st.pyplot(fig_pred)
-    except Exception as e:
-        st.error(f"Error in prediction: {e}")
+# Bar Chart for better comparison
+st.subheader("Stock Comparison - Bar Graph")
+latest_prices = df_selected.iloc[-1, 1:]
+fig, ax = plt.subplots()
+sns.barplot(x=latest_prices.index, y=latest_prices.values, ax=ax)
+ax.set_xlabel("Stock")
+ax.set_ylabel("Latest Closing Price")
+ax.set_title("Latest Stock Prices")
+plt.xticks(rotation=45)
+st.pyplot(fig)
+
+# Future Prediction using Yahoo Finance
+def predict_future(stock):
+    ticker = yf.Ticker(stock)
+    hist = ticker.history(period="1y")
+    last_price = hist['Close'].iloc[-1]
+    predicted_price = last_price * 1.05  # Example: Predicting 5% growth
+    return predicted_price
+
+st.subheader("Future Price Prediction")
+prediction_results = {}
+for stock in selected_stocks:
+    predicted_price = predict_future(stock)
+    prediction_results[stock] = predicted_price
+st.write("Predicted Prices for Next Period:", prediction_results)
